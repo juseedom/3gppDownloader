@@ -55,6 +55,9 @@ python 3GPPdownloader.py -a -r 14 15 -s 36 38
 
 ## Download doc w/ or w/o convert to pdf
 
+The sejda-console is used here:
+https://github.com/torakiki/sejda/releases
+
 ```shell
 # download 36 series, latest version of relase 15
 # convert doc to pdf(only works under windows with Word installed)
