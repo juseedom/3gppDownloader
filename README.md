@@ -1,7 +1,7 @@
-# 3GPPDownloader
-Download 3GPP pdf files from http://www.etsi.org/deliver/etsi_ts/xxx
+# Download doc from 3GPP
 
-Download 3GPP zip(doc) files from http://www.3gpp.org/ftp//Specs/archive/xxx
+<!-- Download 3GPP pdf files from http://www.etsi.org/deliver/etsi_ts/xxx -->
+Download 3GPP zip(doc) files from *<http://www.3gpp.org/ftp//Specs/archive>*
 
 ```shell
 usage: 3GPPdownloader.py [-h] [-a | -d | -c] [-f {doc,pdf}] [-m MULTITHREAD]
@@ -27,8 +27,6 @@ optional arguments:
   -p PATH, --path PATH  Saving path for downloaded 3GPP
 ```
 
-# Download doc from 3GPP
-
 ## Specific output folder
 
 ```shell
@@ -42,6 +40,7 @@ python 3GPPdownloader.py -a -r 15 -s 36 -p /user/xx/Desktop/
 ## Download specific release and series
 
 The series(-s) and release(-r) could accept multiple numbers
+
 ```shell
 # download 36 series, latest version of relase 15
 python 3GPPdownloader.py -a -r 15 -s 36
@@ -55,8 +54,20 @@ python 3GPPdownloader.py -a -r 14 15 -s 36 38
 
 ## Download doc w/ or w/o convert to pdf
 
-The sejda-console is used here:
-https://github.com/torakiki/sejda/releases
+To merge multiple pdf into one pdf, download **sejda-console-x.x.xx-bin.zip**
+ at [here](https://github.com/torakiki/sejda/releases)
+
+Extract and make sure **sejda-console.bat** available at **./bin/sejda-console.bat**
+
+```plainText
+|----3GPPDownloader.py
+|----bin
+|     |----sejda-console
+|     |----sejda-console.bat
+|----lib
+|     |----xxxx.jar
+|     |----xxxx.jar
+```
 
 ```shell
 # download 36 series, latest version of relase 15
@@ -66,6 +77,6 @@ python 3GPPdownloader.py -a -r 15 -s 36
 # only perform convert doc to pdf
 python 3GPPdownloader.py -c -r 15 -s 36
 
-# only downlad doc
+# only download doc
 python 3GPPdownloader.py -d -r 15 -s 36
 ```
