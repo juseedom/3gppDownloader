@@ -44,14 +44,14 @@ optional arguments:
 ```shell
 # download 36 series, latest version of relase 15
 # save reports under './36Series_Rel15/xxx.doc'
-python 3GPPdownloader.py -d -r 15 -s 36
+python 3gppDownloader.py -d -r 15 -s 36
 
 
 # download both 36 and 38 series, latest version of relase 15
 # save reports under './36Series_Rel15/xxx.doc' and './38Series_Rel15/xxx.doc'
 
 # only perform convert doc to pdf (only works under windows with Word installed)
-python 3GPPdownloader.py -c -r 15 -s 36 38
+python 3gppDownloader.py -c -r 15 -s 36 38
 
 
 # download both 36 and 38 series, latest version of relase 15
@@ -59,7 +59,7 @@ python 3GPPdownloader.py -c -r 15 -s 36 38
 # './36Series_Rel16/xxx.doc', './38Series_Rel16/xxx.doc'
 
 # both download and convert format
-python 3GPPdownloader.py -a -r 15 16 -s 36
+python 3gppDownloader.py -a -r 15 16 -s 36
 ```
 
 ### Download Only `-d`
@@ -83,10 +83,10 @@ Perform both download and conversion
 
 ```shell
 # spec download and save as .\36Series_Rel15\xxx.doc
-python 3GPPdownloader.py -d -r 15 -s 36
+python 3gppDownloader.py -d -r 15 -s 36
 
 # spec download and save as /user/xx/Desktop/36Series_Rel15/xxx.doc
-python 3GPPdownloader.py -d -r 15 -s 36 -p /user/xx/Desktop/
+python 3gppDownloader.py -d -r 15 -s 36 -p /user/xx/Desktop/
 ```
 
 ### Specific release and series
@@ -95,13 +95,13 @@ The series(-s) and release(-r) could accept multiple numbers
 
 ```shell
 # download 36 series, latest version of relase 15
-python 3GPPdownloader.py -d -r 15 -s 36
+python 3gppDownloader.py -d -r 15 -s 36
 
 # download both 36 series release 15 and 38 series relase 15
-python 3GPPdownloader.py -d -r 15 -s 36 38
+python 3gppDownloader.py -d -r 15 -s 36 38
 
 # download 36, 38 series, both release 15 and 16
-python 3GPPdownloader.py -d -r 15 16 -s 36 38
+python 3gppDownloader.py -d -r 15 16 -s 36 38
 ```
 
 ## Convert
@@ -112,7 +112,7 @@ To convert word to pdf, **Microsoft Word** is required under **windows**
 
 ```powershell
 # only perform convert for reports under .\36Series_Rel15\xxx.doc
-python 3GPPdownloader.py -c -r 15 -s 36
+python 3gppDownloader.py -c -r 15 -s 36
 ```
 
 ### Compatible Issues
@@ -145,7 +145,7 @@ A java based api console, download **sejda-console-x.x.xx-bin.zip**
 
 Extract and make sure **sejda-console.bat** available at **./bin/sejda-console.bat**
 
-> |----3GPPDownloader.py
+> |----3gppDownloader.py
 > |----bin
 > |     |----sejda-console
 > |     |----sejda-console.bat
