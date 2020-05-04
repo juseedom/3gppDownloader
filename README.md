@@ -1,3 +1,4 @@
+<!-- omit in toc -->
 # Download doc from 3GPP
 
 <!-- Download 3GPP pdf files from http://www.etsi.org/deliver/etsi_ts/xxx -->
@@ -22,7 +23,21 @@ optional arguments:
   -p PATH, --path PATH  Saving path for downloaded 3GPP
 ```
 
-[TOC]
+- [Work Mode](#work-mode)
+  - [Download Only `-d`](#download-only--d)
+  - [Convert Only `-c`](#convert-only--c)
+  - [Download and Convert `-a`](#download-and-convert--a)
+- [Download](#download)
+  - [Specific output folder](#specific-output-folder)
+  - [Specific release and series](#specific-release-and-series)
+- [Convert](#convert)
+  - [Convert to pdf](#convert-to-pdf)
+  - [Compatible Issues](#compatible-issues)
+  - [Merge](#merge)
+    - [Sejda](#sejda)
+      - [Suppress Log levels](#suppress-log-levels)
+    - [Pypdf2](#pypdf2)
+      - [Encoding Issues](#encoding-issues)
 
 ## Work Mode
 
