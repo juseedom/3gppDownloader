@@ -4,7 +4,6 @@
 automatically download 3gpp specs
 """
 
-import logging
 import os
 import re
 import shutil
