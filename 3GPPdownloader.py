@@ -1,112 +1,152 @@
-# pdf version:
-# http://www.etsi.org/deliver/etsi_ts/136100_136199/136101/12.07.00_60/ts_136101v120700p.pdf
-#
-# zip(doc) version:
-# http://www.3gpp.org/ftp//Specs/archive/36_series/36.331/36331-e30.zip
+#!/usr/bin/python3
+
+"""
+automatically download 3gpp specs
+"""
+
+import logging
 import os
 import re
+import shutil
+import sys
+from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
+from typing import Iterator, List, Text, Union
 from urllib import request
 from zipfile import ZipFile
 
-import win32com.client as win32
-NUM = 8
+__all__ = ['HEADERS', 'NUMS', 'm_download', 'm_convert_pdf']
 
-def urldownlaod(urlstr, save_path='.'):
+HEADERS = {
+    'User-Agent':
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.129 Safari/537.36'
+}
+
+NUMS = 8
+
+SEJDA_PATH = str((Path(__file__).parent / 'bin/sejda-console.bat').absolute())
+
+global PLATFORM
+
+if sys.platform.startswith('win32'):
+    PLATFORM = 'win'
+    import win32com.client as win32
+elif sys.platform.startswith('darwin'):
+    PLATFORM = 'mac'
+elif sys.platform.startswith('linux'):
+    PLATFORM = 'linux'
+else:
+    PLATFORM = ''
+
+
+def url_download(url: Text, dir_path: Union[Path, Text] = '.', extract_zip: bool = True) -> None:
     """ download the url and save as files
-    
+
     Args:
-        urlstr (str): the url need to be downloaded
-        save_path (str): the save location for download urls
+        url (str): the file url to be downloaded
+        dir_path (Path, str): folder location to be saved
+        extract_zip (bool): extract zip files, Default is True, extract
+    """
+    file_name = Path(dir_path) / url.split('/')[-1]
+    if file_name.exists():
+        print('Found file exists, overwriting: %s' % str(file_name))
+    
+    with request.urlopen(url) as response, open(file_name, 'wb') as out_file:
+        shutil.copyfileobj(response, out_file)
+        print('File Downloaded: %s' % str(file_name))
+
+    if file_name.suffix == '.zip' and extract_zip:
+        ZipFile(file_name).extractall(dir_path)
+        file_name.unlink()
+        print(file_name.name, 'extracted...')
+
+
+def url_load(url: Text) -> Iterator:
+    """ load a url location and return links
+
+    Args:
+        url (str): the url location to be read
 
     """
-    headers = {
-        'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36'
-    }
-    url = request.Request(url=urlstr, headers=headers)
-    dl_file = request.urlopen(url)
-    name = Path(save_path) / urlstr.split('/')[-1]
-    with open(name, 'wb') as save_file:
-        save_file.write(dl_file.read())
-    print(name.name + ' downloaded...')
-    if name.suffix == '.zip':
-        ZipFile(name).extractall(path=save_path)
-        name.unlink()
-        print(name.name + ' extracted...')
-
-def urlload(urlstr):
-    """ load a url location and return the links observed
-    
-    Args:
-        urlstr (str): the url location to read
-
-    Returns:
-        result (list): a list of link founded in this url
-    """
-
-    result = []
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36'
-        }
-    url = request.Request(url=urlstr, headers=headers)
-    response = str(request.urlopen(url).read())
+    # print('parsing', url, 'now...')
+    req = request.Request(url, headers=HEADERS)
+    response = str(request.urlopen(req).read())
+    # example of response:
     # <A HREF="/deliver/etsi_ts/138200_138299/138202/">[To Parent Directory]</A>
-    # remove the link for [To Parent Directory]
-    href = re.compile('<A HREF="([^"]+)">[^\[^<]+</A>')
-    for link in href.findall(response):
+    for link in re.compile(r'<A HREF="([^"]+)">[^\[^<]+</A>', re.IGNORECASE).findall(response):
         if link.endswith('/'):
-            result.append(urlstr + '/' + link.split('/')[-2])
+            yield (url + '/' + link.split('/')[-2])
         else:
-            result.append(urlstr + '/' + link.split('/')[-1])
-    return result
+            yield (url + '/' + link.split('/')[-1])
 
-def multi_processing(spec_url, rel, save_path='.', mode='doc', convert=True):
-    if mode == 'doc':
-        rel_url = [x for x in urlload(spec_url) if x.split('-')[-1].startswith(rel)]
-        if rel_url:
-            rel_url.sort()
-            rel_url = rel_url[-1]
-            # download zip only or all files
-            if rel_url.split('.')[-1] == 'zip':
-                # urldownlaod(rel_url)
-                headers = {
-                    'User-Agent':
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36'
-                }
-                url = request.Request(url=rel_url, headers=headers)
-                dl_file = request.urlopen(url)
-                file_name = Path(save_path) / rel_url.split('/')[-1]
-                with open(file_name, 'wb') as save_file:
-                    save_file.write(dl_file.read())
-                print(file_name.name + ' downloaded...')
-                if file_name.suffix == '.zip':
-                    ZipFile(file_name).extractall(path=save_path)
-                    file_name.unlink()
-                    print(file_name.name + ' extracted...')
-                # if convert:
-                #     for doc_file in Path(save_path).glob('{}*.doc*'.format(file_name.name[:5])):
-                #         word2pdf(doc_file.absolute())
 
-def word2pdf(filedoc):
+def download(spec_url: Text, release: Text, dir_path: Union[Path, Text] = '.', extract_zip: bool = True) -> None:
+    """ download the 3gpp sepcs, according to release number and series number
+
+    Args:
+        spec_url (str): the spec url to be download, e.g. https://www.3gpp.org/ftp/Specs/archive/38_series/38.900
+        release (str): release version of spec to be download
+        dir_path (Path, str): download save path for spec, Default is '.' current directory
+        extract_zip (bool): extract zip files, Default is True, extract
+    """
+    rel_url = [x for x in url_load(spec_url) if x.split('-')[-1].startswith(release)]
+    if rel_url:
+        rel_url.sort()
+        # download the latest spec within specific release
+        rel_url = rel_url[-1]
+        if rel_url.split('.')[-1] == 'zip':
+            url_download(rel_url, dir_path, extract_zip)
+
+
+def m_download(release: int = 15, series: int = 38, dir_path: Union[Path, Text] = '.', extract_zip: bool = True) -> None:
+    """ multiprocess wrapper to download specs
+
+    Args:
+        release (int): the release number to be download, Default is 15, first release of NR
+        series (int): the series number to be download, Default is 38, NR release
+        dir_path (Path, str): download save path for spec, Default is '.' current directory
+        extract_zip (bool): extract zip files, Default is True, extract
+    """
+
+    series = str(series)
+    release = '0123456789abcdefghijklmn'[release]
+    start_url = 'https://www.3gpp.org/ftp/Specs/archive/{}_series'
+    print('Loading specs urls...')
+    urls = []
+    for url in url_load(start_url.format(series)):
+        if url.split('/')[-1].startswith(series):
+            urls.append(url)
+    print('Specs urls loaded...')
+    _func = partial(download, release=release, dir_path=dir_path, extract_zip=extract_zip)
+    with Pool(NUMS) as pool:
+        for _ in pool.imap_unordered(_func, urls):
+            pass
+
+
+def convert_pdf(doc_path: Union[Path, Text]) -> None:
     """ convert the word *.doc, *.docx to *.pdf (save to same location)
 
     Args:
-        filedoc (str): the file path for doc files
+        doc_path (str): the file path for doc files
     """
     try:
         word = None
         doc = None
-        if Path(filedoc).suffix in ['.doc', '.docx']:
-            output = Path(filedoc).with_suffix('.pdf')
+        if Path(doc_path).suffix in ['.doc', '.docx']:
+            output = Path(doc_path).with_suffix('.pdf')
             if output.exists():
-                print('PDF file existed: {}'.format(filedoc))
+                print('PDF file existed: {}'.format(doc_path))
                 return
-            print('Convert WORD into PDF: ', str(filedoc))
+            print('Convert WORD into PDF: ', str(doc_path))
             word = win32.DispatchEx('Word.Application')
             word.Visible = 0
-            doc = word.Documents.Open(str(filedoc), False, False, True)
+            # https://docs.microsoft.com/en-us/office/vba/api/word.documents.open
+            # .Open (FileName, ConfirmConversions, ReadOnly, AddToRecentFiles, 
+            # PasswordDocument, PasswordTemplate, Revert, WritePasswordDocument, 
+            # WritePasswordTemplate, Format, Encoding, Visible, OpenConflictDocument, 
+            # OpenAndRepair, DocumentDirection, NoEncodingDialog)
+            doc = word.Documents.Open(str(doc_path), False, False, True)
             # 'OutputFileName', 'ExportFormat', 'OpenAfterExport', 'OptimizeFor', 'Range',
             # 'From', 'To', 'Item', 'IncludeDocProps', 'KeepIRM', 'CreateBookmarks', 'DocStructureTags',
             # 'BitmapMissingFonts', 'UseISO19005_1', 'FixedFormatExtClassPtr'
@@ -117,170 +157,140 @@ def word2pdf(filedoc):
                 OptimizeFor=0,
                 CreateBookmarks=1)
     except Exception as e:
-        print('Open failed due to \n' + str(e))
+        print('Open failed due to ' + str(e))
     finally:
         if doc:
             doc.Close()
         if word:
             word.Quit()
 
-def download3GPP(file_type='doc', rel=13, series=36, path='.', convert=True):
-    """ download the 3gpp spec, note the timer guard is 15min
+
+def m_convert_pdf(dir_path: Union[Path, Text] = '.') -> None:
+    """ multiprocessing wrapper for convert_pdf
 
     Args:
-        file_type (str): different file type
-        rel (int): the release number of sepc
-        series (int): the series number of spec
-        path (str): save location
+        dir_path (Path, str): download save path for spec, Default is '.' current directory
     """
-    # os.chdir(path)
-    series = str(series)
-    if file_type == 'pdf':
-        # https://www.etsi.org/deliver/etsi_ts/138100_138199/13810101/15.02.00_60/
-        rel = str(rel)
-        str_url = 'http://www.etsi.org/deliver/etsi_ts'
-        for str_url in [x for x in urlload(str_url) if series == x.split('/')[-1][1:3]]:
-            for spec_url in urlload(str_url):
-                # decide which rel to download
-                rel_url = [x for x in urlload(spec_url) if rel == x.split('/')[-1][:len(rel)]]
-                if rel_url:
-                    rel_url.sort()
-                    rel_url = rel_url[-1]
-                    # download pdf only or all files
-                    file_fmt = 'pdf'
-                    for f_url in [a for a in urlload(rel_url) if a.split('.')[-1] == file_fmt]:
-                        urldownlaod(f_url, path)
-    elif file_type == 'doc':
-        str_url = 'http://www.3gpp.org/ftp/Specs/archive/{}_series'
-        release = '0123456789abcdefghijk'
-        rel = int(rel)
-        rel = release[rel]
-        spec_urls = urlload(str_url.format(series))
-        with Pool(NUM) as pool:
-            # pool.starmap(multi_processing, [(x, rel, path, 'doc') for x in spec_urls], convert)
-            processes = [
-                pool.apply_async(multi_processing, arg)
-                for arg in [(x, rel, path, 'doc', convert) for x in spec_urls]
-            ]
-            for res in processes:
-                result = res.get(timeout=900)
-                if result:
-                    print(result)
+    print('Convert doc to pdf under', dir_path)
+    files = []
+    for _file in Path(dir_path).glob('*.doc*'):
+        if not _file.with_suffix('.pdf').exists():
+            if _file.name.startswith('~'):
+                continue
+            files.append(_file.absolute())
 
-def merge_specs(spec_path='.', sejda_path=r'..\bin\sejda-console.bat', remove=True):
-    from subprocess import call
-    pdf_files = [x for x in os.listdir(spec_path) if x.endswith('.pdf')]
-    _pdf_files = [x.split('_')[0] for x in pdf_files]
-    merge_pdf = {x: [y for y in pdf_files if y.startswith(x)] for x in _pdf_files if _pdf_files.count(x) > 1}
+    with Pool(NUMS) as pool:
+        for _ in pool.imap_unordered(convert_pdf, files): ...
+    
+    if not Path(SEJDA_PATH).exists():
+        print('Cannot find sejda at ', SEJDA_PATH)
+        merge_pdf2(dir_path)
+    else:
+        merge_pdf(dir_path)
+
+
+def merge_pdf2(dir_path: Union[Path, Text] = '.') -> None:
+    """ merge multiple pdf files into one file
+
+    Args:
+        dir_path (Path, Text): input pdf files path, Default is '.'
+    """
+    from PyPDF2 import PdfFileMerger
+    pdf_files = [x for x in Path(dir_path).glob('*.pdf')]
+    _pdf_files = [x.name.split('_')[0] for x in pdf_files]
+    merge_pdf = {x: [y for y in pdf_files if y.name.startswith(x+'_')] 
+                    for x in _pdf_files if _pdf_files.count(x) > 1}
     # print(merge_pdf)
-    old_wd = os.curdir
-    os.chdir(spec_path)
     for spec in merge_pdf:
-        print('Start to merge %s.pdf' %spec)
-        cmd = [sejda_path, 'merge', '--files']
-        [cmd.append(str(x)) for x in merge_pdf[spec]]
+        print('Start to merge %s.pdf with pypdf2' %spec)
+        files = sorted(merge_pdf[spec])
+        for _file in files:
+            if 'cover' in _file.name:
+                _cover = _file
+                files.remove(_cover)
+                break
+        else:
+            _cover = None
+        if _cover:
+            files.insert(0, _cover)
+
+        out_file = str((Path(dir_path)/spec).with_suffix('.pdf'))
+        # print(files, out_file)
+
+        merger = PdfFileMerger()
+        for pdf in files:
+            merger.append(open(str(pdf), 'rb'))
+        with open(out_file, 'wb') as _out_pdf:
+            merger.write(_out_pdf)
+            merger.close()
+
+
+def merge_pdf(dir_path: Union[Path, Text] = '.', remove: bool = False) -> None:
+    """ merge multiple pdf files into one file
+
+    Args:
+        dir_path (Path, Text): input pdf files path, Default is '.'
+        remove (bool): remove original pdf files after conversion, Default is False
+    """
+    from subprocess import call
+    pdf_files = [x for x in Path(dir_path).glob('*.pdf')]
+    _pdf_files = [x.name.split('_')[0] for x in pdf_files]
+    merge_pdf = {x: [y for y in pdf_files if y.name.startswith(x)] for x in _pdf_files if _pdf_files.count(x) > 1}
+    # print(merge_pdf)
+    for spec in merge_pdf:
+        print('Start to merge %s.pdf with sejda' %spec)
+        cmd = [SEJDA_PATH, 'merge', '--files']
+        files = sorted(merge_pdf[spec])
+        for _file in files:
+            if 'cover' in _file.name:
+                _cover = _file
+                files.remove(_cover)
+                break
+        else:
+            _cover = None
+        if _cover:
+            files.insert(0, _cover)
+        out_file = str((Path(dir_path)/spec).with_suffix('.pdf'))
+        [cmd.append(str(x)) for x in files]
         cmd.append('--output')
-        cmd.append('%s.pdf' %spec)
+        cmd.append(out_file)
+        cmd.append('--overwrite')
+        # print(cmd)
         if (call(cmd, timeout=120) == 0) and remove:
             for x in merge_pdf[spec]:
                 Path(x).unlink()
-    os.chdir(old_wd)
+
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
-    parser = ArgumentParser(description='3GPP download tools')
+    parser = ArgumentParser('3gpp download')
     mode = parser.add_mutually_exclusive_group()
-    mode.add_argument('-a', '--all', action='store_true', help='Perform Download, Convert and Merge if doc file type')
+    mode.add_argument('-a', '--all', action='store_true', help='Perform Download, Extract and Convert')
     mode.add_argument('-d', '--download', action='store_true', help='Perform Download only')
-    mode.add_argument('-c', '--convertMerge', action='store_true', help='Perform Convert doc and Merge pdf file')
-    parser.add_argument(
-        '-f', '--filetype',
-        type=str,
-        default='doc',
-        choices=['doc', 'pdf'],
-        help='Downlaod 3GPP from website')
-    parser.add_argument(
-        '-m', '--multithread',
-        type=int,
-        default=6,
-        help='Multi-thread used, the default is 6')
-    parser.add_argument(
-        '-r', '--rel',
-        type=str,
-        nargs='+',
-        default=['15', ],
-        help='Indicate the 3GPP release number, default is 15 (LTE: 8+, NR: 15+)')
-    parser.add_argument(
-        '-s', '--series',
-        type=str,
-        nargs='+',
-        default=['38', ],
-        help='Download the 3GPP series number, eg. 36 for EUTRAN, 38 for NR')
-    parser.add_argument(
-        '-p', '--path',
-        type=str,
-        default='.',
-        help='Saving path for downloaded 3GPP')
+    mode.add_argument('-c', '--convert', action='store_true', help='Perform Convert word to pdf (win+word only)')
+    parser.add_argument('-m', '--multithread', type=int, default=8,
+                        help='Multi-thread used, the default is 8')
+    parser.add_argument('-r', '--release', type=str, nargs='+', default=['15', ],
+                        help='Indicate the 3GPP release number, default is 15 (LTE: 8+, NR: 15+)')
+    parser.add_argument('-s', '--series', type=str, nargs='+', default=['38', ],
+                        help='Download the 3GPP series number, eg. 36 for EUTRAN, 38 for NR')
+    parser.add_argument('-p', '--path', type=str, default='.',
+                        help='Saving path for downloaded 3GPP')
 
     args = parser.parse_args()
-    file_type = args.filetype
-    NUM=args.multithread
+    NUMS = args.multithread
+    _path = Path(args.path).absolute()
 
-    for release in args.rel:
+    for release in args.release:
         for series in args.series:
-            _path = Path(args.path)/'{}Series_Rel{}'.format(series, release)
-            if not Path(_path).exists():
-                Path(_path).mkdir()
-            # print(file_type, path, convert)
+            dir_path = _path/'{}Series_Rel{}'.format(series, release)
+            if not Path(dir_path).exists():
+                Path(dir_path).mkdir()
+
             if args.all:
-                # download doc word from 3gpp
-                download3GPP(file_type, release, series, _path)
-                while True:
-                    files = [
-                        str(x.absolute())
-                        for x in Path(_path).glob(str(series) + '*.doc*')
-                    ]
-                    # remove existed pdf files
-                    files = [
-                        x for x in files
-                        if not Path(x).with_suffix('.pdf').exists()
-                    ]
-                    if len(files) == 0:
-                        break
-                    with Pool(NUM) as pool:
-                        # pool.map(word2pdf, files)
-                        processes = [
-                            pool.apply_async(word2pdf, (arg,)) for arg in files
-                        ]
-                        for res in processes:
-                            result = res.get(timeout=900)
-                            if result:
-                                print("ERROR:")
-                                print(result)
-
-                # merge together
-                # ../bin/sejda-console merge --files /Users/edi/Desktop/test.pdf /Users/edi/Desktop/test1.pdf --output /Users/edi/Desktop/merged.pdf
-                merge_specs(_path)
-
+                m_download(int(release), int(series), dir_path, True)
             elif args.download:
-                download3GPP(file_type, release, series, _path, False)
+                m_download(int(release), int(series), dir_path, False)
 
-            elif args.convertMerge:
-                while True:
-                    files = [str(x.absolute()) for x in Path(_path).glob(str(series)+'*.doc*')]
-                    # remove existed pdf files
-                    files = [x for x in files if not Path(x).with_suffix('.pdf').exists()]
-                    if len(files) == 0:
-                        break
-                    with Pool(NUM) as pool:
-                        # pool.map(word2pdf, files)
-                        processes = [
-                            pool.apply_async(word2pdf, (arg, )) for arg in files
-                        ]
-                        for res in processes:
-                            result = res.get(timeout=900)
-                            if result:
-                                print("ERROR:")
-                                print(result)
-
-                merge_specs(_path)
+            if (PLATFORM == 'win') and (args.all or args.convert):
+                m_convert_pdf(dir_path)
